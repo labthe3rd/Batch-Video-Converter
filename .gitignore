@@ -142,7 +142,7 @@ settings.cfg
 .code-workspace
 
 # Release
-/Release
-/build
-/dist
+Release/
+build/
+dist/
 *.code-workspace

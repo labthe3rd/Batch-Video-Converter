@@ -176,7 +176,7 @@ Code that creates the GUI
 #Create Window
 root = ttk.Window(themename='darkly')
 root.title('Batch Video Converter')
-root.geometry('960x720')
+root.geometry('960x800')
 
 #create icon
 ico = Image.open('Assets\\icons\\app.ico')
