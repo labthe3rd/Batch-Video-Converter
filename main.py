@@ -27,6 +27,8 @@ import subprocess, glob, os
 import configparser
 import pyglet
 from PIL import Image, ImageTk
+import threading
+
 
 #Get config file
 config = configparser.ConfigParser()
@@ -35,10 +37,15 @@ ffmpeg_path=config.get("Path","ffmpeg")
 ffprobe_path=config.get("Path","ffprobe")
 ffplay_path=config.get("Path","ffplay")
 
+output_extensions=config.get("Extensions","output_extensions").split(', ')
+
 #Global Variables
 inputDirectory = ""
 outputDirectory = ""
 file_list = []
+
+
+
 
 """ExitApp
 
@@ -70,7 +77,7 @@ def BrowseInputDirectory():
         outputDirectory = inputDirectory
         selectOutputDirLabel.configure(text=f'{outputDirectory}')
     print('Input selected, now get the files into an array')
-    GetFiles()
+    StartGetFiles()
 """BrowseOutputDirectory
 
 Select output directory for video conversion.
@@ -94,7 +101,7 @@ def GetFiles():
     global file_list
     
     # Get the list of video extensions from the config file
-    video_extensions = config.get('Extensions', 'video_extensions').split(', ')
+    video_extensions = config.get('Extensions', 'output_extensions').split(', ')
     
     directory = inputDirectory
     #Instantiate file list when new directory is selected
@@ -107,9 +114,15 @@ def GetFiles():
                 full_path = os.path.join(root, file)
                 full_path = full_path.replace('\\', '/')
                 file_list.append(full_path)
+    ffmpeg_output_box.delete(1.0,END)
+    ffmpeg_output_box.insert(tk.END, 'Files Found:\n')
+
              
     for file in file_list:
         print(file)  
+        ffmpeg_output_box.insert(tk.END, file + '\n')
+        ffmpeg_output_box.yview(tk.END)
+        
 
 """ConvertVideo
 
@@ -118,18 +131,42 @@ Function will first add all the files to an array. It will then convert each fil
 """
 
 def ConvertVideo():
-    for file in file_list:
-        filename, _ = os.path.splitext(os.path.basename(file))
-        output_file = os.path.join(outputDirectory, f'{filename}.mp4')
-        output_file = output_file.replace('\\', '/')
-        print(f'Output filename is  {output_file}')
-        cmd = [ffmpeg_path, '-i', file, output_file]
-        print(cmd)
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        output, error = process.communicate()
-        ffmpeg_output_box.insert(tk.END, f'Converting {file} to {output_file}\n')
-        ffmpeg_output_box.insert(tk.END, output + '\n' + error + '\n')
-        ffmpeg_output_box.yview(tk.END)
+    extension = selectExtensionCombobox.get()
+    print(extension)
+    ffmpeg_output_box.delete(1.0,END)
+    if extension != "":
+        if file_list:   
+            for file in file_list:
+                filename, _ = os.path.splitext(os.path.basename(file))
+                output_file = os.path.join(outputDirectory, f'{filename}{extension}')
+                output_file = output_file.replace('\\', '/')
+                print(f'Output filename is  {output_file}')
+                cmd = [ffmpeg_path, '-i', file, output_file, '-y']
+                print(cmd)
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                output, error = process.communicate()
+                ffmpeg_output_box.delete(1.0,END)
+                ffmpeg_output_box.insert(tk.END, f'Converting {file} to {output_file}\n')
+                ffmpeg_output_box.insert(tk.END, output + '\n' + error + '\n')
+                ffmpeg_output_box.yview(tk.END)
+        else:
+            print("No video files found.")
+            ffmpeg_output_box.insert(tk.END, f'No files found.')
+    else:
+        print('Must select an output format to run the script')
+        ffmpeg_output_box.insert(tk.END, f'Please select an output extension.')
+
+def StartConvertVideo():
+    #create separate thread for converting video
+    print('Starting convert video thread')
+    t_convert = threading.Thread(target=lambda: ConvertVideo())
+    t_convert.start()
+    
+def StartGetFiles():
+    #create separate thread for getting files
+    print('Getting FIles')
+    t_getfiles = threading.Thread(target=lambda: GetFiles())
+    t_getfiles.start()
 
 '''GUI Creation
 
@@ -140,6 +177,18 @@ Code that creates the GUI
 root = ttk.Window(themename='darkly')
 root.title('Batch Video Converter')
 root.geometry('960x720')
+
+#create icon
+ico = Image.open('Assets\\icons\\app.ico')
+photo = ImageTk.PhotoImage(ico)
+root.wm_iconphoto(False, photo)
+# Create the icon
+
+#Create button icons
+#Create icons for buttons
+browse_icon = ImageTk.PhotoImage(Image.open('Assets\\icons\\Browse.png').resize((25,25)))
+
+
 
 #Title Frame
 titleFrame = ttk.Frame(root)
@@ -166,7 +215,7 @@ selectInputDirLabel = ttk.Label(selectInputFrame, text='',font=("Consolas",14),b
 selectInputDirLabel.pack(side=LEFT, padx=5)
 
 #Input Select File Button
-selectInputDirButton = ttk.Button(selectInputFrame, text='Browse', command=BrowseInputDirectory)
+selectInputDirButton = ttk.Button(selectInputFrame, image=browse_icon, command=BrowseInputDirectory)
 selectInputDirButton.pack(side=LEFT)
 
 #Output Select File Frame
@@ -181,16 +230,28 @@ selectOutputLabel.pack(side=TOP,pady=5)
 selectOutputDirLabel = ttk.Label(selectOutputFrame, text='',font=("Consolas",14),bootstyle='inverse',width=40)
 selectOutputDirLabel.pack(side=LEFT, padx=5)
 
-#Output Select File Button
-selectOutputDirButton = ttk.Button(selectOutputFrame, text='Browse', command=BrowseOutputDirectory)
+#Output Select Directory Button
+selectOutputDirButton = ttk.Button(selectOutputFrame, image=browse_icon, command=BrowseOutputDirectory)
 selectOutputDirButton.pack(side=LEFT)
+
+#Output Select Frame
+selectExtensionFrame = ttk.Frame(root)
+selectExtensionFrame.pack(side=TOP, pady=20)
+
+selectExtensionLabel = ttk.Label(selectExtensionFrame, text="Output Extension", font=('.',16))
+selectExtensionLabel.pack(side=LEFT)
+
+#Output Format Select
+selectExtensionCombobox = ttk.Combobox(selectExtensionFrame,values=output_extensions,state=READONLY)
+selectExtensionCombobox.pack(side=LEFT)
+
 
 #Convert Frame
 convertFrame = ttk.Frame(root)
 convertFrame.pack(side=TOP,pady=20)
 
 #Convert Button
-convertButton = ttk.Button(convertFrame,text='START',command=ConvertVideo,width=15)
+convertButton = ttk.Button(convertFrame,text='START',command=StartConvertVideo,width=15)
 convertButton.pack(side=TOP)
 
 # FFmpeg Output Frame
@@ -212,6 +273,8 @@ exitFrame.pack(side=BOTTOM,pady=40)
 #Exit Button
 exitButton = ttk.Button(exitFrame,text='EXIT',command=root.destroy,width=15)
 exitButton.pack(side=TOP)
+
+
 
 #Run Program
 root.mainloop()
