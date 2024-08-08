@@ -12,11 +12,6 @@ Theme-Editor:   Use ttkbootstrap to easily create a nice looking gui
 Theme-Editor-cmd:   python -m ttkcreator
 
 """
-#At start add path to Modules folder
-import sys
-# caution: path[0] is reserved for script path (or '' in REPL)
-sys.path.insert(1, './Modules')
-import assets
 from gui import BatchVideoConverterApp # type: ignore
 import ttkbootstrap as ttk
 

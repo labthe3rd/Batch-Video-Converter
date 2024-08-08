@@ -8,7 +8,7 @@ from tkinter.scrolledtext import ScrolledText
 
 from config import output_extensions, ffmpeg_path
 from file_utils import browse_directory, get_files
-from ffmpeg_utils import start_convert_video
+from ffmpeg_utils import start_convert_video,get_gpu_accelerators
 
 import assets
 
@@ -18,13 +18,17 @@ class BatchVideoConverterApp:
         self.input_directory = ""
         self.output_directory = ""
         self.file_list = []
+        self.accelerators = get_gpu_accelerators()
 
         self.create_widgets()
 
     def create_widgets(self):
+        #Handle window closing
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_routine)
+        
         # Create window
         self.root.title('Batch Video Converter')
-        self.root.geometry('960x800')
+        self.root.geometry('720x930')
 
         # Create icon
         # ico = Image.open('..\\Assets\\icons\\app.ico')
@@ -68,7 +72,7 @@ class BatchVideoConverterApp:
         select_output_dir_button = ttk.Button(select_output_frame, image=assets.browseIcon, command=self.browse_output_directory)
         select_output_dir_button.pack(side=LEFT)
 
-        # Output Select Frame
+        # Extension Select Frame
         select_extension_frame = ttk.Frame(self.root)
         select_extension_frame.pack(side=TOP, pady=20)
 
@@ -77,6 +81,32 @@ class BatchVideoConverterApp:
 
         self.select_extension_combobox = ttk.Combobox(select_extension_frame, values=output_extensions, state=READONLY)
         self.select_extension_combobox.pack(side=LEFT)
+        
+        # GPU Acceleration Frame
+        gpu_accel_frame = ttk.Frame(self.root)
+        gpu_accel_frame.pack(side=TOP, pady=20)
+
+        use_gpu_label = ttk.Label(gpu_accel_frame, text="Use GPU Acceleration", font=('.', 16))
+        use_gpu_label.pack(side=LEFT)
+
+        self.use_gpu_var = tk.StringVar()
+        self.use_gpu_var.set("No")
+
+        radio_yes = ttk.Radiobutton(gpu_accel_frame, text="Yes", variable=self.use_gpu_var, value="Yes", command=self.toggle_accel_options)
+        radio_yes.pack(side=LEFT, padx=10)
+        
+        radio_no = ttk.Radiobutton(gpu_accel_frame, text="No", variable=self.use_gpu_var, value="No", command=self.toggle_accel_options)
+        radio_no.pack(side=LEFT, padx=10)
+
+        # GPU Accelerator Dropdown
+        self.accel_var = tk.StringVar()
+        self.accel_var.set(self.accelerators[0])  # Set the default option
+
+
+        accel_menu = ttk.OptionMenu(gpu_accel_frame, self.accel_var, self.accelerators[0],*self.accelerators)
+        accel_menu.config(width=10)
+        accel_menu.pack(side=LEFT, padx=5)
+
 
         # Convert Frame
         convert_frame = ttk.Frame(self.root)
@@ -94,13 +124,21 @@ class BatchVideoConverterApp:
 
         self.ffmpeg_output_box = ScrolledText(ffmpeg_output_frame, wrap=tk.WORD, width=60, height=3, font=("Consolas", 10))
         self.ffmpeg_output_box.pack(side=TOP, padx=5, pady=5)
+        
+        # Debug Display Size
+        self.size_label = ttk.Label(self.root, text=f"Window Size: {self.root.winfo_width()}x{self.root.winfo_height()} px", font=("Arial", 10))
+        self.size_label.pack(side=BOTTOM, pady=5)
 
         # Exit Frame
         exit_frame = ttk.Frame(self.root)
         exit_frame.pack(side=BOTTOM, pady=40)
 
-        exit_button = ttk.Button(exit_frame, text='EXIT', command=self.root.destroy, width=15)
+        exit_button = ttk.Button(exit_frame, text='EXIT', command=self.exit_routine, width=15)
         exit_button.pack(side=TOP)
+        
+        # Bind the resize event
+        self.root.bind("<Configure>", self.update_size_label)
+
 
     def browse_input_directory(self):
         self.input_directory = browse_directory()
@@ -125,8 +163,29 @@ class BatchVideoConverterApp:
         for file in self.file_list:
             self.ffmpeg_output_box.insert(tk.END, file + '\n')
             self.ffmpeg_output_box.yview(tk.END)
+            
+    def toggle_accel_options(self):
+        if self.use_gpu_var.get() == "Yes":
+            print(f'Showing gpu acceleration frame {self.accelerators}')
+        else:
+            print(f'Hiding gpu acceleration frame')
+            
+    def update_size_label(self, event):
+        """
+        Update the size label with the current window size in pixels.
 
-if __name__ == "__main__":
-    root = ttk.Window(themename='darkly')
-    app = BatchVideoConverterApp(root)
-    root.mainloop()
+        Args:
+            event: The event object containing information about the resize event.
+        """
+        self.size_label.configure(text=f"Window Size: {self.root.winfo_width()}x{self.root.winfo_height()} px")
+
+
+
+    def exit_routine(self):
+        print('Application exit routine started')
+        self.root.destroy()
+
+# if __name__ == "__main__":
+#     root = ttk.Window(themename='darkly')
+#     app = BatchVideoConverterApp(root)
+#     root.mainloop()
